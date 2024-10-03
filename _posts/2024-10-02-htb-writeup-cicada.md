@@ -1,7 +1,7 @@
 ---
 layout: single
 title: Cicada - Hack The Box
-excerpt: "Cicada is a quick and fun easy box where we have to create a MatterMost account and validate it by using automatic email accounts created by the OsTicket application. The admins on this platform have very poor security practices and put plaintext credentials in MatterMost. Once we get the initial shell with the creds from MatterMost we'll poke around MySQL and get a root password bcrypt hash. Using a hint left in the MatterMost channel about the password being a variation of PleaseSubscribe!, we'll use hashcat combined with rules to crack the password then get the root shell."
+excerpt: "Cicada es una máquina de dificultad fácil que aborda los temas de enumeración de usuarios del dominio, recursos compartidos SMB, abuso de fuga de credenciales para obtener una shell inicial, abuso de SeBackupPrivilege y SeRestorePrivilege, y crackeo de hashes para la escalada de privilegios."
 date: 2024-09-28
 classes: wide
 header:
@@ -13,7 +13,7 @@ categories:
   - windows
 tags:  
   - passthehash
-  - ldapdump
+  - ldapdomaindump
   - AD
   - enumeration
   - netexec
@@ -21,7 +21,7 @@ tags:
 
 ![](/assets/images/htb-writeup-cicada/cicada_logo.jpg)
 
-Delivery is a quick and fun easy box where we have to create a MatterMost account and validate it by using automatic email accounts created by the OsTicket application. The admins on this platform have very poor security practices and put plaintext credentials in MatterMost. Once we get the initial shell with the creds from MatterMost we'll poke around MySQL and get a root password bcrypt hash. Using a hint left in the MatterMost channel about the password being a variation of PleaseSubscribe!, we'll use hashcat combined with rules to crack the password then get the root shell.
+Cicada es una máquina de dificultad fácil que aborda los temas de enumeración de usuarios del dominio, recursos compartidos SMB, abuso de fuga de credenciales para obtener una shell inicial, abuso de SeBackupPrivilege y SeRestorePrivilege, y crackeo de hashes para la escalada de privilegios.
 
 ## Escaneo de Puertos
 
@@ -79,11 +79,11 @@ Host script results:
 
 ## Enumeración
 
-Empezamos enumerando los recursos compartidos por SMB, empleando el siguiente comando: `smbclient -L 10.10.11.35`. Para conectarnos por SMB con una null session.
+Empezamos enumerando los recursos compartidos por SMB, empleando el siguiente comando: `smbclient -L 10.10.11.35`. Para conectarnos por SMB sin credenciales.
 
 ![](/assets/images/htb-writeup-cicada/smbclient.png)
 
-Intentamos acceder a cada recursos compartido. Sin embargo, no nos deja iniciar sin credenciales o está vacío. No obstante en el recurso HR obtenemos el siguiente archivo:
+Intentamos acceder a cada recursos compartido. Sin embargo, existen recursos que no nos deja acceder sin credenciales o está vacío. No obstante en el recurso HR obtenemos el siguiente archivo:
 
 ![](/assets/images/htb-writeup-cicada/smbclient_HR.png)
 
